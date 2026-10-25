@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local WebSocket Chatroom</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e24;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #chat-container {
+            width: 500px;
+            height: 600px;
+            background-color: #2a2a35;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #setup-panel,
+        #room-panel {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        #room-panel {
+            display: none;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #4f46e5;
+        }
+
+        input {
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            background-color: #3f3f51;
+            color: #fff;
+            font-size: 16px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4f46e5;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #4338ca;
+        }
+
+        #message-log {
+            flex-grow: 1;
+            background-color: #1a1a22;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .msg {
+            margin-bottom: 8px;
+        }
+
+        .system {
+            color: #10b981;
+            font-style: italic;
+        }
+
+        .info {
+            color: #3b82f6;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
+        #input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        #input-row input {
+            flex-grow: 1;
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="chat-container">
+        <!-- Screen 1: Username selection -->
+        <div id="setup-panel">
+            <h2>Join Chatroom</h2>
+            <input type="text" id="username-input" placeholder="Enter your username..." autocomplete="off">
+            <button id="join-btn">Connect to Server</button>
+        </div>
+
+        <!-- Screen 2: Active Chatroom Interface -->
+        <div id="room-panel">
+            <div id="message-log"></div>
+            <div id="input-row">
+                <input type="text" id="message-input" placeholder="Type a message or command..." autocomplete="off">
+                <button id="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let username = "Anonymous";
+
+        const setupPanel = document.getElementById('setup-panel');
+        const roomPanel = document.getElementById('room-panel');
+        const usernameInput = document.getElementById('username-input');
+        const joinBtn = document.getElementById('join-btn');
+        const messageLog = document.getElementById('message-log');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Handle initial connection handshake
+        joinBtn.addEventListener('click', () => {
+            username = usernameInput.value.trim() || "Anonymous";
+
+            // Open native browser WebSocket connection to your local server
+            // Replace the old 'ws://localhost:8080' line inside index.html with this:
+            const backendUrl = window.location.hostname === 'localhost'
+                ? 'ws://localhost:8080'
+                : 'wss://://onrender.com'; // You will get this URL in Step 2
+
+            ws = new WebSocket(backendUrl);
+
+
+            ws.onopen = () => {
+                setupPanel.style.display = 'none';
+                roomPanel.style.display = 'flex';
+
+                // Notify server of handle profile assignment
+                ws.send(JSON.stringify({ type: "join", name: username }));
+                appendMessage(`[SYSTEM] Successfully logged onto server as: ${username}`, 'system');
+                messageInput.focus();
+            };
+
+            ws.onmessage = (event) => {
+                const text = event.data;
+                let type = 'standard';
+
+                if (text.startsWith('[SYSTEM]')) type = 'system';
+                else if (text.startsWith('[SERVER-INFO]')) type = 'info';
+                else if (text.startsWith('[SERVER-ERROR]')) type = 'error';
+
+                appendMessage(text, type);
+            };
+
+            ws.onclose = () => {
+                appendMessage("[SYSTEM] Disconnected from server hub.", 'error');
+            };
+        });
+
+        // Handle outbound data routing
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+
+            ws.send(JSON.stringify({ type: "chat", message: text }));
+
+            // Echo back locally if it isn't a silent slash command
+            if (!text.startsWith('/')) {
+                appendMessage(`[${username}]: ${text}`, 'standard');
+            }
+
+            messageInput.value = '';
+            messageInput.focus();
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        usernameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') joinBtn.click(); });
+
+        function appendMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.textContent = text;
+            messageLog.appendChild(div);
+            messageLog.scrollTop = messageLog.scrollHeight; // Auto-scrolls to bottom
+        }
+    </script>
+
+</body>
+
+</html>
