@@ -151,11 +151,9 @@
 
             // Open native browser WebSocket connection to your local server
             // Replace the old 'ws://localhost:8080' line inside index.html with this:
-            const backendUrl = window.location.hostname === 'localhost'
-                ? 'ws://localhost:8080'
-                : 'wss://://onrender.com'; // You will get this URL in Step 2
+            
 
-            ws = new WebSocket(backendUrl);
+            ws = new WebSocket('https://droproom-un71.onrender.com/');
 
 
             ws.onopen = () => {
